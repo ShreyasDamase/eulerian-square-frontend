@@ -1,8 +1,9 @@
 import { View, Text, StyleSheet, ScrollView, Dimensions } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import { ChartBar as BarChart3, Clock, Trophy, Target, TrendingUp, Calendar } from 'lucide-react-native';
+import { ChartBar as BarChart3, Clock, Trophy, Target, TrendingUp, Calendar, Crown, Medal } from 'lucide-react-native';
 import { useTheme } from '@/contexts/ThemeContext';
 import { useState, useEffect } from 'react';
+import { LegendList } from "@legendapp/list";
 
 const { width } = Dimensions.get('window');
 
@@ -19,12 +20,26 @@ interface GameStats {
   totalPlayTime: string;
 }
 
+interface LeaderboardEntry {
+  id: string;
+  rank: number;
+  playerName: string;
+  score: number;
+  gamesWon: number;
+  averageTime: string;
+  isCurrentUser?: boolean;
+}
+
 interface StatCardProps {
   icon: any;
   title: string;
   value: string | number;
   subtitle?: string;
   color: string;
+}
+
+interface LeaderboardItemProps {
+  item: LeaderboardEntry;
 }
 
 function StatCard({ icon: IconComponent, title, value, subtitle, color }: StatCardProps) {
@@ -46,6 +61,67 @@ function StatCard({ icon: IconComponent, title, value, subtitle, color }: StatCa
   );
 }
 
+function LeaderboardItem({ item }: LeaderboardItemProps) {
+  const { colors } = useTheme();
+  
+  const getRankIcon = (rank: number) => {
+    if (rank === 1) return <Crown size={20} color="#FFD700" />;
+    if (rank === 2) return <Medal size={20} color="#C0C0C0" />;
+    if (rank === 3) return <Medal size={20} color="#CD7F32" />;
+    return null;
+  };
+
+  const getRankColor = (rank: number) => {
+    if (rank === 1) return '#FFD700';
+    if (rank === 2) return '#C0C0C0';
+    if (rank === 3) return '#CD7F32';
+    return colors.textSecondary;
+  };
+
+  return (
+    <View style={[
+      styles.leaderboardItem, 
+      { 
+        backgroundColor: item.isCurrentUser ? colors.primary + '15' : colors.surface,
+        borderColor: item.isCurrentUser ? colors.primary : colors.border
+      }
+    ]}>
+      <View style={styles.leaderboardRank}>
+        {getRankIcon(item.rank) || (
+          <Text style={[styles.rankText, { color: getRankColor(item.rank) }]}>
+            {item.rank}
+          </Text>
+        )}
+      </View>
+      
+      <View style={styles.leaderboardPlayerInfo}>
+        <Text style={[
+          styles.playerName, 
+          { color: colors.text },
+          item.isCurrentUser && styles.currentUserText
+        ]}>
+          {item.playerName}
+          {item.isCurrentUser && ' (You)'}
+        </Text>
+        <View style={styles.playerStats}>
+          <Text style={[styles.playerStatText, { color: colors.textSecondary }]}>
+            {item.gamesWon} wins
+          </Text>
+          <Text style={[styles.playerStatDivider, { color: colors.border }]}>•</Text>
+          <Text style={[styles.playerStatText, { color: colors.textSecondary }]}>
+            Avg: {item.averageTime}
+          </Text>
+        </View>
+      </View>
+      
+      <View style={[styles.scoreContainer, { backgroundColor: colors.primary + '20' }]}>
+        <Text style={[styles.scoreText, { color: colors.primary }]}>{item.score}</Text>
+        <Text style={[styles.scoreLabel, { color: colors.textSecondary }]}>pts</Text>
+      </View>
+    </View>
+  );
+}
+
 export default function StatsScreen() {
   const { colors } = useTheme();
   const [stats, setStats] = useState<GameStats>({
@@ -61,6 +137,8 @@ export default function StatsScreen() {
     totalPlayTime: '0h 0m',
   });
 
+  const [leaderboardData, setLeaderboardData] = useState<LeaderboardEntry[]>([]);
+
   useEffect(() => {
     // TODO: Load actual stats from AsyncStorage
     setStats({
@@ -75,6 +153,20 @@ export default function StatsScreen() {
       hardWins: 3,
       totalPlayTime: '6h 23m',
     });
+
+    // TODO: Load actual leaderboard data from API
+    setLeaderboardData([
+      { id: '1', rank: 1, playerName: 'SudokuMaster', score: 9850, gamesWon: 156, averageTime: '03:45' },
+      { id: '2', rank: 2, playerName: 'PuzzleWizard', score: 9620, gamesWon: 142, averageTime: '04:12' },
+      { id: '3', rank: 3, playerName: 'GridNinja', score: 9380, gamesWon: 138, averageTime: '04:33' },
+      { id: '4', rank: 4, playerName: 'NumberHero', score: 8950, gamesWon: 125, averageTime: '05:01' },
+      { id: '5', rank: 5, playerName: 'You', score: 7840, gamesWon: 104, averageTime: '05:28', isCurrentUser: true },
+      { id: '6', rank: 6, playerName: 'LogicKing', score: 7620, gamesWon: 98, averageTime: '05:45' },
+      { id: '7', rank: 7, playerName: 'BrainTeaser', score: 7350, gamesWon: 92, averageTime: '06:12' },
+      { id: '8', rank: 8, playerName: 'PuzzleExpert', score: 7120, gamesWon: 87, averageTime: '06:34' },
+      { id: '9', rank: 9, playerName: 'GridSolver', score: 6890, gamesWon: 81, averageTime: '06:52' },
+      { id: '10', rank: 10, playerName: 'SudokuFan', score: 6650, gamesWon: 76, averageTime: '07:15' },
+    ]);
   }, []);
 
   const winRate = stats.totalGames > 0 ? Math.round((stats.gamesWon / stats.totalGames) * 100) : 0;
@@ -127,6 +219,31 @@ export default function StatsScreen() {
                 value={stats.currentStreak}
                 subtitle={`Best: ${stats.longestStreak}`}
                 color={colors.warning}
+              />
+            </View>
+          </View>
+
+          {/* Leaderboard */}
+          <View style={styles.section}>
+            <View style={styles.sectionHeader}>
+              <Trophy size={24} color={colors.primary} />
+              <Text style={[styles.sectionTitle, { marginBottom: 0, marginLeft: 8 }]}>
+                Global Leaderboard
+              </Text>
+            </View>
+            <Text style={[styles.sectionSubtitle, { color: colors.textSecondary }]}>
+              Top players worldwide
+            </Text>
+            
+            <View style={[styles.leaderboardContainer, { backgroundColor: colors.surface }]}>
+              <LegendList
+                data={leaderboardData}
+                keyExtractor={(item) => item.id}
+                renderItem={({ item }: { item: LeaderboardEntry }) => (
+                  <LeaderboardItem item={item} />
+                )}
+                recycleItems
+                estimatedItemSize={80}
               />
             </View>
           </View>
@@ -223,9 +340,20 @@ const styles = StyleSheet.create({
   section: {
     marginBottom: 32,
   },
+  sectionHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginBottom: 8,
+    marginLeft: 8,
+  },
   sectionTitle: {
     fontSize: 20,
     fontWeight: 'bold',
+    marginBottom: 16,
+    marginLeft: 8,
+  },
+  sectionSubtitle: {
+    fontSize: 14,
     marginBottom: 16,
     marginLeft: 8,
   },
@@ -268,6 +396,69 @@ const styles = StyleSheet.create({
   statSubtitle: {
     fontSize: 11,
     fontWeight: '400',
+  },
+  leaderboardContainer: {
+    borderRadius: 14,
+    overflow: 'hidden',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.05,
+    shadowRadius: 8,
+    elevation: 2,
+    height: 560,
+  },
+  leaderboardItem: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    padding: 16,
+    borderBottomWidth: 1,
+  },
+  leaderboardRank: {
+    width: 40,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  rankText: {
+    fontSize: 18,
+    fontWeight: 'bold',
+  },
+  leaderboardPlayerInfo: {
+    flex: 1,
+    marginLeft: 12,
+  },
+  playerName: {
+    fontSize: 16,
+    fontWeight: '600',
+    marginBottom: 4,
+  },
+  currentUserText: {
+    fontWeight: '700',
+  },
+  playerStats: {
+    flexDirection: 'row',
+    alignItems: 'center',
+  },
+  playerStatText: {
+    fontSize: 12,
+    fontWeight: '400',
+  },
+  playerStatDivider: {
+    marginHorizontal: 8,
+    fontSize: 12,
+  },
+  scoreContainer: {
+    paddingHorizontal: 12,
+    paddingVertical: 6,
+    borderRadius: 8,
+    alignItems: 'center',
+  },
+  scoreText: {
+    fontSize: 16,
+    fontWeight: 'bold',
+  },
+  scoreLabel: {
+    fontSize: 10,
+    fontWeight: '500',
   },
   difficultyContainer: {
     gap: 12,
