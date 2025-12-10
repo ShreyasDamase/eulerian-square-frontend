@@ -30,6 +30,7 @@ import {
   CircleCheck as CheckCircle,
 } from 'lucide-react-native';
 import AsyncStorage from '@react-native-async-storage/async-storage';
+import { useOrientation } from '@/hooks/useWindowDimensions';
 
 const { width } = Dimensions.get('window');
 
@@ -48,6 +49,7 @@ interface GameStats {
 export default function GameScreen() {
   const params = useLocalSearchParams();
   const router = useRouter();
+  const { isLandscape } = useOrientation();
   const { colors } = useTheme();
   const { playSound, vibrate } = useSound();
   const difficulty = (params.difficulty as string) || 'medium';
@@ -468,7 +470,12 @@ export default function GameScreen() {
         progress={progressPercentage}
       />
 
-      <View style={styles.gameContainer}>
+      <View
+        style={[
+          styles.gameContainer,
+          { flexDirection: isLandscape ? 'row' : 'column' },
+        ]}
+      >
         <SudokuGrid
           board={gameState.board}
           originalBoard={gameState.originalBoard}
