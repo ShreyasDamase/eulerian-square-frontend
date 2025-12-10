@@ -33,7 +33,7 @@ module.exports = {
     slug: 'sudoku',
     version: '1.0.0',
 
-    orientation: 'portrait',
+    orientation: 'default',
     userInterfaceStyle: 'automatic',
     newArchEnabled: true,
 

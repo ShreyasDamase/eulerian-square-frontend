@@ -1,6 +1,5 @@
 import React, { createContext, useContext, useState } from 'react';
 import { Platform } from 'react-native';
-import { Audio } from 'expo-av';
 
 // ✅ Import sound files
 import tapSound from '../assets/sounds/tap.mp3';
@@ -66,10 +65,13 @@ export function SoundProvider({ children }: { children: React.ReactNode }) {
       }
     } else {
       try {
+        const { Audio } = await import('expo-av');
         const { sound } = await Audio.Sound.createAsync(soundMap[type]);
+
         await sound.playAsync();
+
         sound.setOnPlaybackStatusUpdate((status) => {
-          if (status.didJustFinish) {
+          if ((status as any)?.didJustFinish) {
             sound.unloadAsync();
           }
         });
