@@ -1,4 +1,4 @@
-package com.shreyas_damse.boltexponativewind
+package com.shreyas.sudoku.preview
 import expo.modules.splashscreen.SplashScreenManager
 
 import android.os.Build

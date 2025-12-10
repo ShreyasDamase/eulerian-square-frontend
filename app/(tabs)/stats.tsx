@@ -166,6 +166,9 @@ export default function StatsScreen() {
       { id: '8', rank: 8, playerName: 'PuzzleExpert', score: 7120, gamesWon: 87, averageTime: '06:34' },
       { id: '9', rank: 9, playerName: 'GridSolver', score: 6890, gamesWon: 81, averageTime: '06:52' },
       { id: '10', rank: 10, playerName: 'SudokuFan', score: 6650, gamesWon: 76, averageTime: '07:15' },
+      { id: '11', rank: 11, playerName: 'PuzzleExpert', score: 5120, gamesWon: 67, averageTime: '06:34' },
+      { id: '12', rank: 12, playerName: 'GridSolver', score: 4890, gamesWon: 51, averageTime: '06:52' },
+      { id: '13', rank: 13, playerName: 'SudokuFan', score: 3650, gamesWon: 46, averageTime: '07:15' },
     ]);
   }, []);
 
@@ -243,7 +246,7 @@ export default function StatsScreen() {
                   <LeaderboardItem item={item} />
                 )}
                 recycleItems
-                estimatedItemSize={80}
+                estimatedItemSize={80}  nestedScrollEnabled={true}
               />
             </View>
           </View>
