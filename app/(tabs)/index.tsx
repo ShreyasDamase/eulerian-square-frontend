@@ -1,16 +1,33 @@
-import { View, Text, StyleSheet, TouchableOpacity, Dimensions, ScrollView, Animated, StatusBar } from 'react-native';
+import {
+  View,
+  Text,
+  StyleSheet,
+  TouchableOpacity,
+  ScrollView,
+  Animated,
+  StatusBar,
+  Alert,
+} from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useRouter } from 'expo-router';
-import { Play, Trophy, CircleHelp as HelpCircle, Clock, Target, TrendingUp, Award } from 'lucide-react-native';
+import {
+  Play,
+  Trophy,
+  CircleHelp as HelpCircle,
+  Clock,
+  Target,
+  TrendingUp,
+  Award,
+} from 'lucide-react-native';
 import { useTheme } from '@/contexts/ThemeContext';
 import { useSound } from '@/contexts/SoundContext';
 import { useState, useEffect, useRef } from 'react';
 import { LinearGradient } from 'expo-linear-gradient';
-
-const { width, height } = Dimensions.get('window');
+import { useSudokuStore } from '@/utils/useSudokuStore';
+import { S, V, R, H, getWidth, getHeight } from '@/utils/responsive';
 
 interface DifficultyLevel {
-  level: string;
+  level: 'easy' | 'medium' | 'hard';
   title: string;
   subtitle: string;
   description: string;
@@ -39,12 +56,15 @@ export default function HomeScreen() {
     bestTime: '--:--',
     currentStreak: 0,
   });
-  const [selectedDifficulty, setSelectedDifficulty] = useState<string | null>(null);
+  const [isStarting, setIsStarting] = useState(false);
+
+  // 🔥 Access store's startNewGame
+  const startNewGameInStore = useSudokuStore((state) => state.startNewGame);
 
   const difficultyLevels: DifficultyLevel[] = [
-    { 
-      level: 'easy', 
-      title: 'Easy', 
+    {
+      level: 'easy',
+      title: 'Easy',
       subtitle: 'Perfect for beginners',
       description: 'More clues, gentle introduction to Sudoku',
       color: '#10B981',
@@ -53,9 +73,9 @@ export default function HomeScreen() {
       cellsFilled: '40-45',
       icon: Target,
     },
-    { 
-      level: 'medium', 
-      title: 'Medium', 
+    {
+      level: 'medium',
+      title: 'Medium',
       subtitle: 'Moderate challenge',
       description: 'Balanced difficulty, good for regular players',
       color: '#F59E0B',
@@ -64,9 +84,9 @@ export default function HomeScreen() {
       cellsFilled: '30-35',
       icon: TrendingUp,
     },
-    { 
-      level: 'hard', 
-      title: 'Hard', 
+    {
+      level: 'hard',
+      title: 'Hard',
       subtitle: 'For experienced players',
       description: 'Minimal clues, requires advanced techniques',
       color: '#EF4444',
@@ -105,14 +125,25 @@ export default function HomeScreen() {
     });
   }, []);
 
-  const startGame = (difficulty: string) => {
+  // ✅ FIXED: Properly initialize store BEFORE navigation
+  const startGame = async (difficulty: 'easy' | 'medium' | 'hard') => {
+    if (isStarting) return; // Prevent double-tap
+
     playSound('tap');
-    setSelectedDifficulty(difficulty);
-    
-    setTimeout(() => {
-      router.push(`/game?difficulty=${difficulty}`);
-      setSelectedDifficulty(null);
-    }, 150);
+    setIsStarting(true);
+
+    try {
+      // 🔥 CRITICAL: Reset store + generate new puzzle
+      await startNewGameInStore(difficulty);
+
+      // ✅ Navigate AFTER store is ready (no params needed)
+      router.replace('/game');
+    } catch (error) {
+      console.error('Failed to start game:', error);
+      Alert.alert('Error', 'Failed to start game. Please try again.');
+    } finally {
+      setIsStarting(false);
+    }
   };
 
   const showStats = () => {
@@ -138,31 +169,34 @@ export default function HomeScreen() {
     extrapolate: 'clamp',
   });
 
-  // Fixed scroll handler
   const onScroll = Animated.event(
     [{ nativeEvent: { contentOffset: { y: scrollY } } }],
-    { useNativeDriver: false } // Changed to false to fix the error
+    { useNativeDriver: false }
   );
 
   return (
-    <SafeAreaView style={[styles.container, { backgroundColor: colors.background }]}>
-      <StatusBar barStyle={colors.text === '#000000' ? 'dark-content' : 'light-content'} />
-      
-      <ScrollView 
-        showsVerticalScrollIndicator={false} 
+    <SafeAreaView
+      style={[styles.container, { backgroundColor: colors.background }]}
+    >
+      <StatusBar
+        barStyle={colors.text === '#000000' ? 'dark-content' : 'light-content'}
+      />
+
+      <ScrollView
+        showsVerticalScrollIndicator={false}
         contentContainerStyle={styles.scrollContent}
         bounces={true}
         scrollEventThrottle={16}
         onScroll={onScroll}
       >
         {/* Animated Header */}
-        <Animated.View 
+        <Animated.View
           style={[
             styles.header,
             {
               opacity: headerOpacity,
               transform: [{ scale: headerScale }],
-            }
+            },
           ]}
         >
           <Text style={[styles.title, { color: colors.text }]}>Sudoku</Text>
@@ -173,42 +207,48 @@ export default function HomeScreen() {
 
         {/* Quick Stats */}
         <View style={styles.statsContainer}>
-          <TouchableOpacity 
+          <TouchableOpacity
             style={[styles.statCard, { backgroundColor: colors.surface }]}
             onPress={showStats}
             activeOpacity={0.7}
           >
             <View style={styles.statHeader}>
-              <Trophy size={20} color={colors.textSecondary} />
-              <Text style={[styles.statLabel, { color: colors.textSecondary }]}>Games Won</Text>
+              <Trophy size={getWidth(20)} color={colors.textSecondary} />
+              <Text style={[styles.statLabel, { color: colors.textSecondary }]}>
+                Games Won
+              </Text>
             </View>
             <Text style={[styles.statValue, { color: colors.text }]}>
               {gameStats.gamesWon}/{gameStats.totalGames}
             </Text>
           </TouchableOpacity>
 
-          <TouchableOpacity 
+          <TouchableOpacity
             style={[styles.statCard, { backgroundColor: colors.surface }]}
             onPress={showStats}
             activeOpacity={0.7}
           >
             <View style={styles.statHeader}>
-              <Clock size={20} color={colors.textSecondary} />
-              <Text style={[styles.statLabel, { color: colors.textSecondary }]}>Best Time</Text>
+              <Clock size={getWidth(20)} color={colors.textSecondary} />
+              <Text style={[styles.statLabel, { color: colors.textSecondary }]}>
+                Best Time
+              </Text>
             </View>
             <Text style={[styles.statValue, { color: colors.text }]}>
               {gameStats.bestTime}
             </Text>
           </TouchableOpacity>
 
-          <TouchableOpacity 
+          <TouchableOpacity
             style={[styles.statCard, { backgroundColor: colors.surface }]}
             onPress={showAchievements}
             activeOpacity={0.7}
           >
             <View style={styles.statHeader}>
-              <Target size={20} color={colors.textSecondary} />
-              <Text style={[styles.statLabel, { color: colors.textSecondary }]}>Streak</Text>
+              <Target size={getWidth(20)} color={colors.textSecondary} />
+              <Text style={[styles.statLabel, { color: colors.textSecondary }]}>
+                Streak
+              </Text>
             </View>
             <Text style={[styles.statValue, { color: colors.text }]}>
               {gameStats.currentStreak}
@@ -218,25 +258,26 @@ export default function HomeScreen() {
 
         {/* Difficulty Selection */}
         <View style={styles.difficultyContainer}>
-          <Text style={[styles.sectionTitle, { color: colors.text }]}>Choose Difficulty</Text>
+          <Text style={[styles.sectionTitle, { color: colors.text }]}>
+            Choose Difficulty
+          </Text>
           {difficultyLevels.map((item) => {
             const IconComponent = item.icon;
-            const isSelected = selectedDifficulty === item.level;
-            
+
             return (
               <TouchableOpacity
                 key={item.level}
                 style={[
-                  styles.difficultyButton, 
-                  { 
+                  styles.difficultyButton,
+                  {
                     borderColor: item.color,
                     backgroundColor: colors.surface,
-                    transform: [{ scale: isSelected ? 0.98 : 1 }],
-                    opacity: isSelected ? 0.8 : 1,
-                  }
+                    opacity: isStarting ? 0.6 : 1,
+                  },
                 ]}
                 onPress={() => startGame(item.level)}
                 activeOpacity={0.8}
+                disabled={isStarting}
               >
                 <LinearGradient
                   colors={item.gradient}
@@ -244,31 +285,53 @@ export default function HomeScreen() {
                   start={{ x: 0, y: 0 }}
                   end={{ x: 1, y: 1 }}
                 >
-                  <IconComponent size={24} color="#FFFFFF" />
+                  <IconComponent size={getWidth(24)} color="#FFFFFF" />
                 </LinearGradient>
-                
+
                 <View style={styles.difficultyText}>
-                  <Text style={[styles.difficultyTitle, { color: colors.text }]}>
+                  <Text
+                    style={[styles.difficultyTitle, { color: colors.text }]}
+                  >
                     {item.title}
                   </Text>
-                  <Text style={[styles.difficultySubtitle, { color: colors.textSecondary }]}>
+                  <Text
+                    style={[
+                      styles.difficultySubtitle,
+                      { color: colors.textSecondary },
+                    ]}
+                  >
                     {item.subtitle}
                   </Text>
-                  <Text style={[styles.difficultyDescription, { color: colors.textSecondary }]}>
+                  <Text
+                    style={[
+                      styles.difficultyDescription,
+                      { color: colors.textSecondary },
+                    ]}
+                  >
                     {item.description}
                   </Text>
                 </View>
-                
+
                 <View style={styles.difficultyStats}>
                   <View style={styles.difficultyStatItem}>
-                    <Clock size={14} color={colors.textSecondary} />
-                    <Text style={[styles.difficultyStatText, { color: colors.textSecondary }]}>
+                    <Clock size={getWidth(14)} color={colors.textSecondary} />
+                    <Text
+                      style={[
+                        styles.difficultyStatText,
+                        { color: colors.textSecondary },
+                      ]}
+                    >
                       {item.estimatedTime}
                     </Text>
                   </View>
                   <View style={styles.difficultyStatItem}>
-                    <Target size={14} color={colors.textSecondary} />
-                    <Text style={[styles.difficultyStatText, { color: colors.textSecondary }]}>
+                    <Target size={getWidth(14)} color={colors.textSecondary} />
+                    <Text
+                      style={[
+                        styles.difficultyStatText,
+                        { color: colors.textSecondary },
+                      ]}
+                    >
                       {item.cellsFilled} clues
                     </Text>
                   </View>
@@ -280,20 +343,32 @@ export default function HomeScreen() {
 
         {/* How to Play */}
         <View style={styles.infoContainer}>
-          <Text style={[styles.sectionTitle, { color: colors.text }]}>How to Play</Text>
+          <Text style={[styles.sectionTitle, { color: colors.text }]}>
+            How to Play
+          </Text>
           <View style={[styles.infoCard, { backgroundColor: colors.surface }]}>
             {howToPlaySteps.map((step, index) => {
               const IconComponent = step.icon;
               return (
                 <View key={index} style={styles.infoRow}>
-                  <View style={[styles.infoIconContainer, { backgroundColor: colors.background }]}>
-                    <IconComponent size={20} color={colors.textSecondary} />
+                  <View
+                    style={[
+                      styles.infoIconContainer,
+                      { backgroundColor: colors.background },
+                    ]}
+                  >
+                    <IconComponent
+                      size={getWidth(20)}
+                      color={colors.textSecondary}
+                    />
                   </View>
                   <View style={styles.infoTextContainer}>
                     <Text style={[styles.infoTitle, { color: colors.text }]}>
                       {step.title}
                     </Text>
-                    <Text style={[styles.infoText, { color: colors.textSecondary }]}>
+                    <Text
+                      style={[styles.infoText, { color: colors.textSecondary }]}
+                    >
                       {step.description}
                     </Text>
                   </View>
@@ -303,7 +378,6 @@ export default function HomeScreen() {
           </View>
         </View>
 
-        {/* Bottom spacing for tab bar */}
         <View style={styles.bottomSpacing} />
       </ScrollView>
     </SafeAreaView>
@@ -315,34 +389,34 @@ const styles = StyleSheet.create({
     flex: 1,
   },
   scrollContent: {
-    paddingBottom: 100,
+    paddingBottom: H.xl,
   },
   header: {
     alignItems: 'center',
-    paddingVertical: 30,
-    paddingHorizontal: 20,
+    paddingVertical: V.xl,
+    paddingHorizontal: S.lg,
   },
   title: {
-    fontSize: 48,
+    fontSize: getWidth(48),
     fontWeight: 'bold',
-    marginBottom: 8,
+    marginBottom: V.sm,
     textAlign: 'center',
   },
   subtitle: {
-    fontSize: 18,
+    fontSize: getWidth(18),
     fontWeight: '500',
     textAlign: 'center',
   },
   statsContainer: {
     flexDirection: 'row',
-    paddingHorizontal: 20,
-    marginBottom: 30,
-    gap: 12,
+    paddingHorizontal: S.lg,
+    marginBottom: V.xl,
+    gap: S.smPlus,
   },
   statCard: {
     flex: 1,
-    padding: 16,
-    borderRadius: 12,
+    padding: S.md,
+    borderRadius: R.md,
     shadowColor: '#000',
     shadowOffset: { width: 0, height: 2 },
     shadowOpacity: 0.1,
@@ -352,32 +426,32 @@ const styles = StyleSheet.create({
   statHeader: {
     flexDirection: 'row',
     alignItems: 'center',
-    marginBottom: 8,
+    marginBottom: V.sm,
   },
   statLabel: {
-    fontSize: 12,
+    fontSize: getWidth(12),
     fontWeight: '500',
-    marginLeft: 6,
+    marginLeft: S.xs,
   },
   statValue: {
-    fontSize: 18,
+    fontSize: getWidth(18),
     fontWeight: 'bold',
   },
   difficultyContainer: {
-    paddingHorizontal: 20,
-    marginBottom: 30,
+    paddingHorizontal: S.lg,
+    marginBottom: V.xl,
   },
   sectionTitle: {
-    fontSize: 24,
+    fontSize: getWidth(24),
     fontWeight: 'bold',
-    marginBottom: 20,
+    marginBottom: V.lg,
   },
   difficultyButton: {
     flexDirection: 'row',
     alignItems: 'center',
-    padding: 20,
-    borderRadius: 16,
-    marginBottom: 16,
+    padding: S.lg,
+    borderRadius: R.lg,
+    marginBottom: V.md,
     borderWidth: 2,
     shadowColor: '#000',
     shadowOffset: { width: 0, height: 4 },
@@ -386,29 +460,29 @@ const styles = StyleSheet.create({
     elevation: 5,
   },
   difficultyIcon: {
-    width: 50,
-    height: 50,
-    borderRadius: 25,
+    width: getWidth(50),
+    height: getWidth(50),
+    borderRadius: R.full,
     justifyContent: 'center',
     alignItems: 'center',
-    marginRight: 16,
+    marginRight: S.md,
   },
   difficultyText: {
     flex: 1,
   },
   difficultyTitle: {
-    fontSize: 18,
+    fontSize: getWidth(18),
     fontWeight: 'bold',
-    marginBottom: 4,
+    marginBottom: V.xs,
   },
   difficultySubtitle: {
-    fontSize: 14,
+    fontSize: getWidth(14),
     fontWeight: '500',
-    marginBottom: 4,
+    marginBottom: V.xs,
   },
   difficultyDescription: {
-    fontSize: 12,
-    lineHeight: 16,
+    fontSize: getWidth(12),
+    lineHeight: getHeight(16),
   },
   difficultyStats: {
     alignItems: 'flex-end',
@@ -416,18 +490,18 @@ const styles = StyleSheet.create({
   difficultyStatItem: {
     flexDirection: 'row',
     alignItems: 'center',
-    marginBottom: 4,
+    marginBottom: V.xs,
   },
   difficultyStatText: {
-    fontSize: 12,
-    marginLeft: 4,
+    fontSize: getWidth(12),
+    marginLeft: S.xs,
   },
   infoContainer: {
-    paddingHorizontal: 20,
+    paddingHorizontal: S.lg,
   },
   infoCard: {
-    padding: 20,
-    borderRadius: 16,
+    padding: S.lg,
+    borderRadius: R.lg,
     shadowColor: '#000',
     shadowOffset: { width: 0, height: 4 },
     shadowOpacity: 0.1,
@@ -437,29 +511,29 @@ const styles = StyleSheet.create({
   infoRow: {
     flexDirection: 'row',
     alignItems: 'flex-start',
-    marginBottom: 20,
+    marginBottom: V.lg,
   },
   infoIconContainer: {
-    width: 40,
-    height: 40,
-    borderRadius: 20,
+    width: getWidth(40),
+    height: getWidth(40),
+    borderRadius: R.full,
     justifyContent: 'center',
     alignItems: 'center',
-    marginRight: 16,
+    marginRight: S.md,
   },
   infoTextContainer: {
     flex: 1,
   },
   infoTitle: {
-    fontSize: 16,
+    fontSize: getWidth(16),
     fontWeight: 'bold',
-    marginBottom: 4,
+    marginBottom: V.xs,
   },
   infoText: {
-    fontSize: 14,
-    lineHeight: 20,
+    fontSize: getWidth(14),
+    lineHeight: getHeight(20),
   },
   bottomSpacing: {
-    height: 20,
+    height: V.lg,
   },
 });

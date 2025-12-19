@@ -4,10 +4,13 @@ import { StatusBar } from 'expo-status-bar';
 import { useFrameworkReady } from '@/hooks/useFrameworkReady';
 import { ThemeProvider } from '@/contexts/ThemeContext';
 import { SoundProvider } from '@/contexts/SoundContext';
+import { useSudokuStore } from '@/utils/useSudokuStore';
 
 export default function RootLayout() {
   useFrameworkReady();
-
+  useEffect(() => {
+    useSudokuStore.getState().hydrate();
+  }, []);
   return (
     <ThemeProvider>
       <SoundProvider>

@@ -7,11 +7,18 @@ import {
   ChartBar as BarChart3,
   House,
 } from 'lucide-react-native';
-import { useColorScheme, Platform, Dimensions } from 'react-native';
+import {
+  useColorScheme,
+  Platform,
+  Dimensions,
+  TouchableOpacity,
+  ViewStyle,
+} from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useEffect, useState } from 'react';
 import { BlurView } from 'expo-blur';
 import { useTheme } from '@/contexts/ThemeContext';
+import { useSudokuStore } from '@/utils/useSudokuStore';
 
 // Tab configuration with enhanced metadata
 const tabConfig = [
@@ -51,6 +58,7 @@ export default function TabLayout() {
   const { colors, isDarkMode } = useTheme();
   const insets = useSafeAreaInsets();
   const [dimensions, setDimensions] = useState(Dimensions.get('window'));
+  const hasActiveGame = useSudokuStore((state) => state.puzzleId !== '');
 
   // Handle orientation changes
   useEffect(() => {
@@ -94,7 +102,7 @@ export default function TabLayout() {
   const iconSize = getIconSize();
 
   // Enhanced tab bar styling that responds to theme changes
-  const tabBarStyle = {
+  const tabBarStyle: ViewStyle = {
     backgroundColor: isDarkMode
       ? 'rgba(30, 30, 30, 0.95)'
       : 'rgba(255, 255, 255, 0.95)',
@@ -161,28 +169,50 @@ export default function TabLayout() {
         },
       }}
     >
-      {tabConfig.map((tab) => (
-        <Tabs.Screen
-          key={tab.name}
-          name={tab.name}
-          options={{
-            title: tab.title,
-            tabBarIcon: ({ color, focused }) => {
-              const IconComponent = tab.icon;
-              return (
-                <IconComponent
-                  size={focused ? iconSize + 2 : iconSize}
-                  color={color}
-                  strokeWidth={focused ? 2.5 : 2}
-                />
-              );
-            },
-            tabBarAccessibilityLabel: `${tab.title} tab`,
-            tabBarAccessibilityHint: tab.description,
-            tabBarTestID: `${tab.name}-tab`,
-          }}
-        />
-      ))}
+      {tabConfig.map((tab) => {
+        const isGameTab = tab.name === 'game';
+
+        return (
+          <Tabs.Screen
+            key={tab.name}
+            name={tab.name}
+            options={{
+              title: tab.title,
+
+              // 🔒 Disable interaction when no game
+              tabBarButton: (props) => {
+                const { onPress, children, accessibilityState, style } = props;
+                const disabled = isGameTab && !hasActiveGame;
+
+                return (
+                  <TouchableOpacity
+                    onPress={disabled ? undefined : onPress}
+                    accessibilityState={accessibilityState}
+                    style={[style, disabled && { opacity: 0.4 }]}
+                    disabled={disabled}
+                    activeOpacity={0.7}
+                  >
+                    {children}
+                  </TouchableOpacity>
+                );
+              },
+
+              tabBarIcon: ({ color, focused }) => {
+                const IconComponent = tab.icon;
+                return (
+                  <IconComponent
+                    size={focused ? iconSize + 2 : iconSize}
+                    color={
+                      isGameTab && !hasActiveGame ? colors.textSecondary : color
+                    }
+                    strokeWidth={focused ? 2.5 : 2}
+                  />
+                );
+              },
+            }}
+          />
+        );
+      })}
     </Tabs>
   );
 }
