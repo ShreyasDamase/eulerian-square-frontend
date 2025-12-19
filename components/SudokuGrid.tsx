@@ -1,11 +1,14 @@
+// ============================================================================
+// SudokuGrid.tsx - Optimized Professional Grid
+// ============================================================================
 import { View, StyleSheet, Dimensions } from 'react-native';
 import { SudokuCell } from './SudokuCell';
 import { SudokuGridProps } from '@/types/sudoku';
 import { useTheme } from '@/contexts/ThemeContext';
+import { S, R, getWidth } from '@/utils/responsive';
 
 const { width } = Dimensions.get('window');
-const gridSize = Math.min(width - 40, 400);
-const cellSize = gridSize / 9;
+const gridSize = Math.min(width - getWidth(32), getWidth(400));
 
 export function SudokuGrid({
   board,
@@ -19,7 +22,17 @@ export function SudokuGrid({
 
   return (
     <View style={styles.container}>
-      <View style={[styles.grid, { backgroundColor: colors.border }]}>
+      <View
+        style={[
+          styles.grid,
+          {
+            backgroundColor: colors.background,
+            width: gridSize,
+            height: gridSize,
+            borderColor: colors.border,
+          },
+        ]}
+      >
         {board.map((value, index) => (
           <SudokuCell
             key={index}
@@ -30,6 +43,7 @@ export function SudokuGrid({
             hasError={errors.includes(index)}
             isPaused={isPaused}
             onPress={onCellPress}
+            gridSize={gridSize}
           />
         ))}
       </View>
@@ -40,14 +54,18 @@ export function SudokuGrid({
 const styles = StyleSheet.create({
   container: {
     alignItems: 'center',
-    marginVertical: 20,
+    paddingVertical: S.md,
   },
   grid: {
-    width: gridSize,
-    height: gridSize,
     flexDirection: 'row',
     flexWrap: 'wrap',
-    borderRadius: 8,
-    padding: 2,
+    borderRadius: R.md,
+    borderWidth: 3,
+    overflow: 'hidden',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.15,
+    shadowRadius: 8,
+    elevation: 8,
   },
 });

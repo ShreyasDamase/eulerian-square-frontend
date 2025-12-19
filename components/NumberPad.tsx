@@ -1,18 +1,14 @@
-import {
-  View,
-  TouchableOpacity,
-  Text,
-  StyleSheet,
-  Dimensions,
-} from 'react-native';
+// ============================================================================
+// NumberPad.tsx - Modern Number Pad
+// ============================================================================
+import { View, TouchableOpacity, Text, StyleSheet } from 'react-native';
 import { NumberPadProps } from '@/types/sudoku';
 import { Trash2 } from 'lucide-react-native';
 import { useTheme } from '@/contexts/ThemeContext';
 import { useSound } from '@/contexts/SoundContext';
-import { R, S } from '@/utils/responsive';
+import { R, S, getWidth } from '@/utils/responsive';
 
-const { width } = Dimensions.get('window');
-const buttonSize = (width - 80) / 5;
+const buttonSize = getWidth(68);
 
 export function NumberPad({
   onNumberPress,
@@ -35,17 +31,22 @@ export function NumberPad({
 
   return (
     <View style={styles.container}>
-      <View style={styles.numbersRow}>
+      {/* First Row: 1-5 */}
+      <View style={styles.row}>
         {numbers.slice(0, 5).map((number) => (
           <TouchableOpacity
             key={number}
             style={[
               styles.numberButton,
-              { backgroundColor: colors.surface, borderColor: colors.border },
+              {
+                backgroundColor: colors.surface,
+                borderColor: colors.border,
+              },
               disabled && styles.disabled,
             ]}
             onPress={() => handleNumberPress(number)}
             disabled={disabled}
+            activeOpacity={0.7}
           >
             <Text
               style={[
@@ -60,17 +61,22 @@ export function NumberPad({
         ))}
       </View>
 
-      <View style={styles.numbersRow}>
+      {/* Second Row: 6-9 + Clear */}
+      <View style={styles.row}>
         {numbers.slice(5).map((number) => (
           <TouchableOpacity
             key={number}
             style={[
               styles.numberButton,
-              { backgroundColor: colors.surface, borderColor: colors.border },
+              {
+                backgroundColor: colors.surface,
+                borderColor: colors.border,
+              },
               disabled && styles.disabled,
             ]}
             onPress={() => handleNumberPress(number)}
             disabled={disabled}
+            activeOpacity={0.7}
           >
             <Text
               style={[
@@ -89,16 +95,17 @@ export function NumberPad({
             styles.clearButton,
             {
               backgroundColor: colors.surface,
-              borderColor: colors.error + '40',
+              borderColor: '#FCA5A5',
             },
             disabled && styles.disabled,
           ]}
           onPress={handleClearPress}
           disabled={disabled}
+          activeOpacity={0.7}
         >
           <Trash2
-            size={24}
-            color={disabled ? colors.textSecondary : colors.error}
+            size={getWidth(22)}
+            color={disabled ? colors.textSecondary : '#DC2626'}
           />
         </TouchableOpacity>
       </View>
@@ -108,12 +115,13 @@ export function NumberPad({
 
 const styles = StyleSheet.create({
   container: {
-    paddingVertical: S.sm,
-    alignItems: 'center',
+    paddingHorizontal: S.md,
+    paddingVertical: S.lg,
   },
-  numbersRow: {
+  row: {
     flexDirection: 'row',
     justifyContent: 'center',
+    alignItems: 'center',
     marginBottom: S.sm,
   },
   numberButton: {
@@ -123,16 +131,16 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     alignItems: 'center',
     marginHorizontal: S.xs,
+    borderWidth: 1.5,
     shadowColor: '#000',
     shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.1,
+    shadowOpacity: 0.08,
     shadowRadius: 4,
-    elevation: 3,
-    borderWidth: 2,
+    elevation: 2,
   },
   numberText: {
-    fontSize: S.lg,
-    fontWeight: 'bold',
+    fontSize: getWidth(24),
+    fontWeight: '700',
   },
   clearButton: {
     width: buttonSize,
@@ -140,15 +148,15 @@ const styles = StyleSheet.create({
     borderRadius: R.md,
     justifyContent: 'center',
     alignItems: 'center',
-    marginHorizontal: 5,
+    marginHorizontal: S.xs,
+    borderWidth: 1.5,
     shadowColor: '#000',
     shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.1,
-    shadowRadius: R.md,
-    elevation: 3,
-    borderWidth: 2,
+    shadowOpacity: 0.08,
+    shadowRadius: 4,
+    elevation: 2,
   },
   disabled: {
-    opacity: 0.5,
+    opacity: 0.4,
   },
 });

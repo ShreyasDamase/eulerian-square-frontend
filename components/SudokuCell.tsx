@@ -1,50 +1,62 @@
-import { TouchableOpacity, Text, StyleSheet, Dimensions } from 'react-native';
+// ============================================================================
+// SudokuCell.tsx - Enhanced Cell Component
+// ============================================================================
+import { TouchableOpacity, Text, StyleSheet, ViewStyle } from 'react-native';
 import { CellProps } from '@/types/sudoku';
 import { useTheme } from '@/contexts/ThemeContext';
+import { getWidth } from '@/utils/responsive';
 
-const { width } = Dimensions.get('window');
-const gridSize = Math.min(width - 40, 400);
-const cellSize = (gridSize - 8) / 9; // Account for grid borders
+interface EnhancedCellProps extends CellProps {
+  gridSize: number;
+}
 
-export function SudokuCell({ 
-  value, 
-  index, 
-  isSelected, 
-  isOriginal, 
-  hasError, 
-  isPaused, 
-  onPress 
-}: CellProps) {
+export function SudokuCell({
+  value,
+  index,
+  isSelected,
+  isOriginal,
+  hasError,
+  isPaused,
+  onPress,
+  gridSize,
+}: EnhancedCellProps) {
   const { colors } = useTheme();
   const row = Math.floor(index / 9);
   const col = index % 9;
-  
-  const getBorderStyle = () => {
-    const borderStyle: any = {
-      borderWidth: 1,
-      borderColor: colors.border,
+  const cellSize = (gridSize - 6) / 9; // Account for border
+
+  const getBorderStyle = (): ViewStyle => {
+    const borderStyle: ViewStyle = {
+      borderWidth: 0.5,
+      borderColor: colors.border + '40',
     };
-    
-    // Thicker borders for 3x3 boxes
-    if (row % 3 === 0) borderStyle.borderTopWidth = 2;
-    if (col % 3 === 0) borderStyle.borderLeftWidth = 2;
-    if (row % 3 === 2) borderStyle.borderBottomWidth = 2;
-    if (col % 3 === 2) borderStyle.borderRightWidth = 2;
-    
+
+    // Bold borders for 3x3 boxes
+    if (row % 3 === 0 && row !== 0) borderStyle.borderTopWidth = 2;
+    if (col % 3 === 0 && col !== 0) borderStyle.borderLeftWidth = 2;
+
     return borderStyle;
   };
 
   const getBackgroundColor = () => {
-    if (isPaused) return colors.border;
-    if (hasError) return colors.error + '20';
-    if (isSelected) return colors.primary + '20';
-    if (isOriginal) return colors.background;
-    return colors.surface;
+    if (isPaused) return colors.surface;
+    if (hasError) return '#FEE2E2'; // Light red
+    if (isSelected) return colors.primary + '15';
+
+    // Subtle alternating box pattern (LinkedIn style)
+    const boxRow = Math.floor(row / 3);
+    const boxCol = Math.floor(col / 3);
+    const isAlternate = (boxRow + boxCol) % 2 === 0;
+
+    if (isOriginal) {
+      return isAlternate ? colors.background : colors.surface + '30';
+    }
+    return isAlternate ? colors.surface + '50' : colors.background;
   };
 
   const getTextColor = () => {
     if (isPaused) return colors.textSecondary;
-    if (hasError) return colors.error;
+    if (hasError) return '#DC2626'; // Red-600
     if (isOriginal) return colors.text;
     return colors.primary;
   };
@@ -53,19 +65,33 @@ export function SudokuCell({
     <TouchableOpacity
       style={[
         styles.cell,
+        {
+          width: cellSize,
+          height: cellSize,
+          backgroundColor: getBackgroundColor(),
+        },
         getBorderStyle(),
-        { backgroundColor: getBackgroundColor() },
-        isSelected && { shadowColor: colors.primary },
+        isSelected && {
+          backgroundColor: colors.primary + '20',
+          borderWidth: 2,
+          borderColor: colors.primary,
+        },
       ]}
       onPress={() => onPress(index)}
-      disabled={isPaused}
+      disabled={isPaused || isOriginal}
+      activeOpacity={0.6}
     >
-      <Text style={[
-        styles.cellText,
-        { color: getTextColor() },
-        isOriginal && styles.originalText,
-      ]}>
-        {isPaused ? '?' : (value || '')}
+      <Text
+        style={[
+          styles.cellText,
+          {
+            color: getTextColor(),
+            fontSize: cellSize * 0.55,
+          },
+          isOriginal && styles.originalText,
+        ]}
+      >
+        {isPaused ? '' : value || ''}
       </Text>
     </TouchableOpacity>
   );
@@ -73,17 +99,14 @@ export function SudokuCell({
 
 const styles = StyleSheet.create({
   cell: {
-    width: cellSize,
-    height: cellSize,
     justifyContent: 'center',
     alignItems: 'center',
   },
   cellText: {
-    fontSize: cellSize * 0.5,
-    fontWeight: 'bold',
+    fontWeight: '600',
     textAlign: 'center',
   },
   originalText: {
-    fontWeight: '900',
+    fontWeight: '800',
   },
 });

@@ -1,73 +1,110 @@
+// ============================================================================
+// GameControls.tsx - Modern Control Bar
+// ============================================================================
 import { View, TouchableOpacity, Text, StyleSheet } from 'react-native';
 import { GameControlsProps } from '@/types/sudoku';
-import { RotateCcw, Lightbulb, CircleCheck as CheckCircle, Plus } from 'lucide-react-native';
+import { RotateCcw, Lightbulb, CheckCircle, Plus } from 'lucide-react-native';
 import { useTheme } from '@/contexts/ThemeContext';
+import { S, R, getWidth } from '@/utils/responsive';
 
-export function GameControls({ 
-  onNewGame, 
-  onReset, 
-  onHint, 
-  onCheck, 
-  hints, 
-  disabled 
+export function GameControls({
+  onNewGame,
+  onReset,
+  onHint,
+  onCheck,
+  hints,
+  disabled,
 }: GameControlsProps) {
   const { colors } = useTheme();
 
+  const controls = [
+    {
+      icon: Plus,
+      label: 'New',
+      onPress: onNewGame,
+      color: colors.primary,
+      bgColor: colors.primary,
+      textColor: '#FFFFFF',
+      disabled: disabled,
+    },
+    {
+      icon: RotateCcw,
+      label: 'Reset',
+      onPress: onReset,
+      color: '#DC2626',
+      bgColor: colors.surface,
+      textColor: '#DC2626',
+      disabled: disabled,
+    },
+    {
+      icon: Lightbulb,
+      label: `Hint (${hints})`,
+      onPress: onHint,
+      color: '#F59E0B',
+      bgColor: colors.surface,
+      textColor: '#F59E0B',
+      disabled: disabled || hints === 0,
+    },
+    {
+      icon: CheckCircle,
+      label: 'Check',
+      onPress: onCheck,
+      color: '#10B981',
+      bgColor: colors.surface,
+      textColor: '#10B981',
+      disabled: disabled,
+    },
+  ];
+
   return (
     <View style={styles.container}>
-      <TouchableOpacity
-        style={[
-          styles.controlButton, 
-          { backgroundColor: colors.primary, borderColor: colors.primary },
-          disabled && styles.disabled
-        ]}
-        onPress={onNewGame}
-        disabled={disabled}
-      >
-        <Plus size={20} color="#FFFFFF" />
-        <Text style={[styles.buttonText, { color: '#FFFFFF' }]}>New Game</Text>
-      </TouchableOpacity>
+      {controls.map((control, index) => {
+        const Icon = control.icon;
+        const isDisabled = control.disabled;
 
-      <TouchableOpacity
-        style={[
-          styles.controlButton, 
-          { backgroundColor: colors.surface, borderColor: colors.error + '40' },
-          disabled && styles.disabled
-        ]}
-        onPress={onReset}
-        disabled={disabled}
-      >
-        <RotateCcw size={20} color={colors.error} />
-        <Text style={[styles.buttonText, { color: colors.error }]}>Reset</Text>
-      </TouchableOpacity>
-
-      <TouchableOpacity
-        style={[
-          styles.controlButton, 
-          { backgroundColor: colors.surface, borderColor: colors.warning + '40' },
-          (disabled || hints === 0) && styles.disabled
-        ]}
-        onPress={onHint}
-        disabled={disabled || hints === 0}
-      >
-        <Lightbulb size={20} color={hints > 0 ? colors.warning : colors.textSecondary} />
-        <Text style={[styles.buttonText, { color: hints > 0 ? colors.warning : colors.textSecondary }]}>
-          Hint ({hints})
-        </Text>
-      </TouchableOpacity>
-
-      <TouchableOpacity
-        style={[
-          styles.controlButton, 
-          { backgroundColor: colors.surface, borderColor: colors.success + '40' },
-          disabled && styles.disabled
-        ]}
-        onPress={onCheck}
-        disabled={disabled}
-      >
-        <CheckCircle size={20} color={colors.success} />
-        <Text style={[styles.buttonText, { color: colors.success }]}>Check</Text>
-      </TouchableOpacity>
+        return (
+          <TouchableOpacity
+            key={index}
+            style={[
+              styles.button,
+              {
+                backgroundColor: control.bgColor,
+                borderColor: control.color + '30',
+              },
+              index === 0 && styles.primaryButton,
+              isDisabled && styles.disabledButton,
+            ]}
+            onPress={control.onPress}
+            disabled={isDisabled}
+            activeOpacity={0.7}
+          >
+            <Icon
+              size={getWidth(18)}
+              color={
+                isDisabled
+                  ? colors.textSecondary
+                  : index === 0
+                  ? '#FFFFFF'
+                  : control.color
+              }
+            />
+            <Text
+              style={[
+                styles.buttonText,
+                {
+                  color: isDisabled
+                    ? colors.textSecondary
+                    : index === 0
+                    ? '#FFFFFF'
+                    : control.textColor,
+                },
+              ]}
+            >
+              {control.label}
+            </Text>
+          </TouchableOpacity>
+        );
+      })}
     </View>
   );
 }
@@ -76,32 +113,36 @@ const styles = StyleSheet.create({
   container: {
     flexDirection: 'row',
     justifyContent: 'space-between',
-    paddingVertical: 20,
-    flexWrap: 'wrap',
-    gap: 10,
+    paddingHorizontal: S.md,
+    paddingVertical: S.md,
+    gap: S.sm,
   },
-  controlButton: {
+  button: {
     flex: 1,
-    minWidth: 80,
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
-    paddingVertical: 12,
-    paddingHorizontal: 8,
-    borderRadius: 8,
+    paddingVertical: S.smPlus,
+    paddingHorizontal: S.xs,
+    borderRadius: R.md,
+    borderWidth: 1.5,
     shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.1,
+    shadowOffset: { width: 0, height: 1 },
+    shadowOpacity: 0.05,
+    shadowRadius: 2,
+    elevation: 1,
+  },
+  primaryButton: {
+    shadowOpacity: 0.2,
     shadowRadius: 4,
     elevation: 3,
-    borderWidth: 2,
   },
   buttonText: {
-    fontSize: 12,
-    fontWeight: 'bold',
-    marginLeft: 4,
+    fontSize: getWidth(12),
+    fontWeight: '700',
+    marginLeft: S.xs,
   },
-  disabled: {
-    opacity: 0.5,
+  disabledButton: {
+    opacity: 0.4,
   },
 });
