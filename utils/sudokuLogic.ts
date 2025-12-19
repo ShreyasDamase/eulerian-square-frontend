@@ -1,202 +1,200 @@
 import { SudokuBoard, Difficulty } from '@/types/sudoku';
 
-// API Configuration - Move to environment variables
-// API Configuration - Move to environment variables
-const API_BASE_URL = 'https://api.api-ninjas.com/v1';
-const API_KEY = '1nqfjpr9ScXj84iiQGQnkw==EnUOQu47sU23sxtC';
-function printSudoku(title: string, flatBoard: number[]) {
-  console.log(`\n📋 ${title}`);
-  for (let i = 0; i < 9; i++) {
-    const row = flatBoard
-      .slice(i * 9, (i + 1) * 9)
-      .map((n) => (n === 0 ? '.' : n))
-      .join(' ');
-    console.log(row);
-  }
+const SIZE = 9;
+const SUBGRID = 3;
+
+// Difficulty configuration
+const DIFFICULTY_EMPTY_CELLS = {
+  easy: 35,
+  medium: 45,
+  hard: 55,
+};
+
+// ============================================================================
+// CORE GENERATION LOGIC
+// ============================================================================
+
+function createEmptyGrid(): number[][] {
+  return Array.from({ length: SIZE }, () => Array(SIZE).fill(0));
 }
 
-// API Headers
-const getHeaders = () => ({
-  'X-Api-Key': API_KEY,
-  'Content-Type': 'application/json',
-});
-
-// Convert null values to 0 for our board format
-function processApiBoard(board: (number | null)[][]): number[] {
-  console.log('[DEBUG] Inside processApiBoard');
-  if (!Array.isArray(board)) {
-    console.error('[ERROR] Input is not an array:', board);
-    throw new Error('Board is not an array');
+function isSafe(
+  grid: number[][],
+  row: number,
+  col: number,
+  num: number
+): boolean {
+  // Check row and column
+  for (let i = 0; i < SIZE; i++) {
+    if (grid[row][i] === num || grid[i][col] === num) return false;
   }
 
-  for (let i = 0; i < board.length; i++) {
-    if (!Array.isArray(board[i])) {
-      console.error(`[ERROR] Row ${i} is not an array:`, board[i]);
-      throw new Error(`Row ${i} is not an array`);
-    }
+  // Check 3x3 subgrid
+  const startRow = row - (row % SUBGRID);
+  const startCol = col - (col % SUBGRID);
 
-    for (let j = 0; j < board[i].length; j++) {
-      const cell = board[i][j];
-      if (
-        cell !== null &&
-        typeof cell !== 'number' &&
-        typeof cell !== 'undefined'
-      ) {
-        console.error(
-          `[ERROR] Invalid cell at (${i},${j}):`,
-          cell,
-          'Type:',
-          typeof cell
-        );
-        throw new Error(`Invalid cell value at [${i}][${j}]`);
+  for (let r = 0; r < SUBGRID; r++) {
+    for (let c = 0; c < SUBGRID; c++) {
+      if (grid[startRow + r][startCol + c] === num) return false;
+    }
+  }
+
+  return true;
+}
+
+function shuffle<T>(arr: T[]): T[] {
+  const shuffled = [...arr];
+  for (let i = shuffled.length - 1; i > 0; i--) {
+    const j = Math.floor(Math.random() * (i + 1));
+    [shuffled[i], shuffled[j]] = [shuffled[j], shuffled[i]];
+  }
+  return shuffled;
+}
+
+function fillGrid(grid: number[][]): boolean {
+  for (let row = 0; row < SIZE; row++) {
+    for (let col = 0; col < SIZE; col++) {
+      if (grid[row][col] === 0) {
+        const nums = shuffle([1, 2, 3, 4, 5, 6, 7, 8, 9]);
+
+        for (const num of nums) {
+          if (isSafe(grid, row, col, num)) {
+            grid[row][col] = num;
+            if (fillGrid(grid)) return true;
+            grid[row][col] = 0;
+          }
+        }
+        return false;
       }
     }
   }
-
-  try {
-    const flat = board.flat();
-    console.log('[DEBUG] Flat board created. Length:', flat.length);
-    return flat.map((cell) => (cell === null || cell === 0 ? 0 : cell));
-  } catch (err) {
-    console.error('[ERROR] Failed during flattening or mapping', err);
-    throw err;
-  }
+  return true;
 }
 
-// Convert our board format to API format (2D array with nulls)
-function toApiBoard(board: number[]): (number | null)[][] {
-  const board2D: (number | null)[][] = [];
-  for (let i = 0; i < 9; i++) {
-    const row: (number | null)[] = [];
-    for (let j = 0; j < 9; j++) {
-      const value = board[i * 9 + j];
-      row.push(value === 0 ? null : value);
-    }
-    board2D.push(row);
-  }
-  return board2D;
+function generateSudokuFlat(): number[] {
+  const grid = createEmptyGrid();
+  fillGrid(grid);
+  return grid.flat();
 }
 
-// Generate a sudoku puzzle using API Ninjas
-export async function generateSudoku(
+// ============================================================================
+// PUZZLE CREATION FROM SOLUTION
+// ============================================================================
+
+function createPuzzleFromSolution(
+  solution: number[],
   difficulty: Difficulty
-): Promise<SudokuBoard> {
-  try {
-    if (!API_KEY) {
-      console.warn('API key not configured, using fallback puzzle');
-      return generateFallbackPuzzle(difficulty);
-    }
+): { board: number[]; solution: number[] } {
+  const emptyCount = DIFFICULTY_EMPTY_CELLS[difficulty];
 
-    console.log(`[DEBUG] Requested difficulty: ${difficulty}`);
-
-    const url = `${API_BASE_URL}/sudokugenerate?difficulty=${difficulty}&width=3&height=3`;
-    console.log(`[DEBUG] Fetching URL: ${url}`);
-
-    const controller = new AbortController();
-    const timeoutId = setTimeout(() => controller.abort(), 10000); // 10s timeout
-
-    let response: Response;
-    try {
-      response = await fetch(url, {
-        method: 'GET',
-        headers: getHeaders(),
-        signal: controller.signal,
-      });
-    } catch (err) {
-      clearTimeout(timeoutId);
-      console.error('[FETCH ERROR]', err);
-      throw new Error('Failed to fetch from API');
-    }
-
-    clearTimeout(timeoutId);
-
-    if (!response.ok) {
-      throw new Error(
-        `[HTTP ERROR] Status: ${response.status} ${response.statusText}`
-      );
-    }
-
-    let rawText: string = '';
-    try {
-      rawText = await response.text();
-      console.log('[DEBUG] Raw response text:', rawText);
-    } catch (e) {
-      throw new Error('[PARSE ERROR] Failed to read response text');
-    }
-
-    let data: any;
-    try {
-      data = JSON.parse(rawText);
-      console.log(
-        '[DEBUG] Parsed response JSON:',
-        JSON.stringify(data, null, 2)
-      );
-    } catch (e) {
-      console.error('[JSON ERROR] Invalid JSON response');
-      throw new Error('Invalid JSON from API');
-    }
-
-    // === STRUCTURE VALIDATION ===
-    if (!data || typeof data !== 'object') {
-      throw new Error('[VALIDATION] Empty or malformed response');
-    }
-
-    if (!Array.isArray(data.puzzle)) {
-      console.error('[VALIDATION] puzzle is not array', data.puzzle);
-      throw new Error('[VALIDATION] puzzle missing or invalid');
-    }
-
-    if (!Array.isArray(data.solution)) {
-      console.error('[VALIDATION] solution is not array', data.solution);
-      throw new Error('[VALIDATION] solution missing or invalid');
-    }
-
-    if (data.puzzle.length !== 9 || data.solution.length !== 9) {
-      throw new Error('[VALIDATION] puzzle/solution must be 9 rows');
-    }
-
-    for (let i = 0; i < 9; i++) {
-      if (!Array.isArray(data.puzzle[i]) || data.puzzle[i].length !== 9) {
-        throw new Error(`[VALIDATION] puzzle row ${i} invalid`);
-      }
-      if (!Array.isArray(data.solution[i]) || data.solution[i].length !== 9) {
-        throw new Error(`[VALIDATION] solution row ${i} invalid`);
-      }
-    }
-
-    let board: number[] = [];
-    let solution: number[] = [];
-
-    try {
-      board = processApiBoard(data.puzzle);
-      solution = processApiBoard(data.solution);
-      printSudoku('Generated Board', board);
-      printSudoku('Solution', solution);
-    } catch (err) {
-      console.error('[PROCESS ERROR]', err);
-      throw new Error('Failed to process board data');
-    }
-
-    if (!isValidSudokuBoard(solution)) {
-      throw new Error('[VALIDATION] Invalid solution returned from API');
-    }
-
-    console.log(
-      '[SUCCESS] Generated board with',
-      board.filter((cell) => cell === 0).length,
-      'empty cells'
-    );
-
-    return { board, solution };
-  } catch (error: any) {
-    console.error('[generateSudoku ERROR]', error?.message || error);
-    console.warn('Falling back to local puzzle generation...');
-    return generateFallbackPuzzle(difficulty);
+  if (emptyCount == null) {
+    throw new Error(`Invalid difficulty: ${difficulty}`);
   }
+
+  const board = [...solution]; // Clone solution
+  const indices = shuffle([...Array(81).keys()]);
+
+  let removed = 0;
+  for (const index of indices) {
+    if (removed >= emptyCount) break;
+    if (board[index] !== 0) {
+      board[index] = 0;
+      removed++;
+    }
+  }
+
+  console.log(`Generated ${difficulty} puzzle with ${removed} empty cells`);
+
+  return { board, solution };
 }
 
-// Improved local backtracking solver
-function solveSudokuLocal(board: number[]): number[] {
+// ============================================================================
+// VALIDATION
+// ============================================================================
+
+function isValidSudokuBoard(flatGrid: number[]): boolean {
+  if (!Array.isArray(flatGrid) || flatGrid.length !== 81) {
+    return false;
+  }
+
+  // Convert 1D → 2D
+  const grid: number[][] = [];
+  for (let i = 0; i < SIZE; i++) {
+    grid.push(flatGrid.slice(i * SIZE, i * SIZE + SIZE));
+  }
+
+  const isValidGroup = (nums: number[]): boolean => {
+    const set = new Set(nums);
+    return (
+      set.size === 9 &&
+      [...set].every((n) => Number.isInteger(n) && n >= 1 && n <= 9)
+    );
+  };
+
+  // Validate rows
+  for (let r = 0; r < SIZE; r++) {
+    if (!isValidGroup(grid[r])) return false;
+  }
+
+  // Validate columns
+  for (let c = 0; c < SIZE; c++) {
+    const column: number[] = [];
+    for (let r = 0; r < SIZE; r++) {
+      column.push(grid[r][c]);
+    }
+    if (!isValidGroup(column)) return false;
+  }
+
+  // Validate 3x3 subgrids
+  for (let row = 0; row < SIZE; row += 3) {
+    for (let col = 0; col < SIZE; col += 3) {
+      const box: number[] = [];
+      for (let r = 0; r < 3; r++) {
+        for (let c = 0; c < 3; c++) {
+          box.push(grid[row + r][col + c]);
+        }
+      }
+      if (!isValidGroup(box)) return false;
+    }
+  }
+
+  return true;
+}
+
+// ============================================================================
+// PUBLIC API
+// ============================================================================
+
+export function generateSudoku(difficulty: Difficulty): SudokuBoard {
+  console.log(`Generating ${difficulty} Sudoku puzzle...`);
+
+  const solution = generateSudokuFlat();
+
+  if (!isValidSudokuBoard(solution)) {
+    throw new Error('Generated solution is invalid');
+  }
+
+  const { board, solution: validatedSolution } = createPuzzleFromSolution(
+    solution,
+    difficulty
+  );
+
+  return { board, solution: validatedSolution };
+}
+
+// ============================================================================
+// SOLVER (Backtracking with MRV Heuristic)
+// ============================================================================
+
+export function solveSudoku(board: number[]): number[] {
+  console.log('Solving puzzle...');
+
+  // First check if the input board is valid
+  if (validateSudoku(board).length > 0) {
+    console.log('Cannot solve - invalid initial board');
+    return [];
+  }
+
   const solution = [...board];
   let steps = 0;
   const MAX_STEPS = 50000;
@@ -227,7 +225,7 @@ function solveSudokuLocal(board: number[]): number[] {
   function solve(): boolean {
     steps++;
     if (steps > MAX_STEPS) {
-      console.log('Local solver timeout');
+      console.log('Solver timeout');
       return false;
     }
 
@@ -246,85 +244,19 @@ function solveSudokuLocal(board: number[]): number[] {
 
   const success = solve();
   if (success) {
-    console.log(`Local solver completed in ${steps} steps`);
+    console.log(`Puzzle solved in ${steps} steps`);
+  } else {
+    console.log('Could not solve puzzle');
+    return [];
   }
-  return success ? solution : [];
+
+  return solution;
 }
 
-// Solve sudoku using API Ninjas with improved error handling
-export async function solveSudoku(board: number[]): Promise<number[]> {
-  try {
-    console.log('Solving puzzle using API Ninjas...');
+// ============================================================================
+// VALIDATION & UTILITY FUNCTIONS
+// ============================================================================
 
-    // First check if the input board is valid
-    if (validateSudoku(board).length > 0) {
-      console.log('Cannot solve - invalid initial board');
-      return [];
-    }
-
-    if (!API_KEY || API_KEY === 'your-api-key-here') {
-      console.warn('API key not configured, using local solver');
-      return solveSudokuLocal(board);
-    }
-
-    const apiBoard = toApiBoard(board);
-    const controller = new AbortController();
-    const timeoutId = setTimeout(() => controller.abort(), 15000); // 15 second timeout
-
-    const response = await fetch(`${API_BASE_URL}/sudokusolve`, {
-      method: 'POST',
-      headers: getHeaders(),
-      body: JSON.stringify({
-        puzzle: apiBoard,
-        width: 3,
-        height: 3,
-      }),
-      signal: controller.signal,
-    });
-
-    clearTimeout(timeoutId);
-
-    if (!response.ok) {
-      throw new Error(
-        `Solve request failed: ${response.status} ${response.statusText}`
-      );
-    }
-
-    const data = await response.json();
-
-    // Add detailed logging for debugging
-    console.log('Solve API Response:', JSON.stringify(data, null, 2));
-
-    if (data.status === 'solved' && data.solution) {
-      // Validate response structure
-      if (!Array.isArray(data.solution) || data.solution.length !== 9) {
-        throw new Error('Invalid solution format from API');
-      }
-
-      const solution = processApiBoard(data.solution);
-
-      // Validate the solution
-      if (!isValidSudokuBoard(solution)) {
-        throw new Error('Invalid solution from API');
-      }
-
-      console.log('Puzzle solved successfully');
-      return solution;
-    } else {
-      console.log(
-        'Puzzle could not be solved:',
-        data.status || 'Unknown error'
-      );
-      return [];
-    }
-  } catch (error) {
-    console.error('Error solving puzzle:', error);
-    console.log('Falling back to local solving...');
-    return solveSudokuLocal(board);
-  }
-}
-
-// Enhanced validation function
 export function validateSudoku(board: number[]): number[] {
   const errorSet = new Set<number>();
 
@@ -375,14 +307,6 @@ export function validateSudoku(board: number[]): number[] {
   return Array.from(errorSet);
 }
 
-// Check if a complete board is valid
-function isValidSudokuBoard(board: number[]): boolean {
-  if (board.length !== 81) return false;
-  if (board.some((cell) => cell < 1 || cell > 9)) return false;
-  return validateSudoku(board).length === 0;
-}
-
-// Check if a move is valid
 export function isValidMove(
   board: number[],
   index: number,
@@ -394,6 +318,7 @@ export function isValidMove(
   const row = Math.floor(index / 9);
   const col = index % 9;
   const value = board[index];
+
   if (value !== 0 && value !== null) {
     return false; // Cell is already filled
   }
@@ -420,89 +345,6 @@ export function isValidMove(
   return true;
 }
 
-// Fixed fallback puzzle generator with valid solutions
-export function generateFallbackPuzzle(difficulty: Difficulty): SudokuBoard {
-  console.log(`Generating fallback ${difficulty} puzzle...`);
-
-    const puzzles = {
-      easy: {
-        board: [
-          5, 3, 0, 0, 7, 0, 0, 0, 0, 6, 0, 0, 1, 9, 5, 0, 0, 0, 0, 9, 8, 0, 0, 0,
-          0, 6, 0, 8, 0, 0, 0, 6, 0, 0, 0, 3, 4, 0, 0, 8, 0, 3, 0, 0, 1, 7, 0, 0,
-          0, 2, 0, 0, 0, 6, 0, 6, 0, 0, 0, 0, 2, 8, 0, 0, 0, 0, 4, 1, 9, 0, 0, 5,
-          0, 0, 0, 0, 8, 0, 0, 7, 9,
-        ],
-        solution: [
-          5, 3, 4, 6, 7, 8, 9, 1, 2, 6, 7, 2, 1, 9, 5, 3, 4, 8, 1, 9, 8, 3, 4, 2,
-          5, 6, 7, 8, 5, 9, 7, 6, 1, 4, 2, 3, 4, 2, 6, 8, 5, 3, 7, 9, 1, 7, 1, 3,
-          9, 2, 4, 8, 5, 6, 9, 6, 1, 5, 3, 7, 2, 8, 4, 2, 8, 7, 4, 1, 9, 6, 3, 5,
-          3, 4, 5, 2, 8, 6, 1, 7, 9,
-        ],
-      },
-      medium: {
-        board: [
-          0, 0, 0, 6, 0, 0, 4, 0, 0, 7, 0, 0, 0, 0, 3, 6, 0, 0, 0, 0, 0, 0, 9, 1,
-          0, 8, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 5, 0, 1, 8, 0, 0, 0, 3, 0, 0, 0,
-          3, 0, 6, 0, 4, 5, 0, 4, 0, 2, 0, 0, 0, 6, 0, 9, 0, 3, 0, 0, 0, 0, 0, 0,
-          0, 2, 0, 0, 0, 0, 1, 0, 0,
-        ],
-        solution: [
-          5, 8, 1, 6, 7, 2, 4, 3, 9, 7, 9, 2, 8, 4, 3, 6, 5, 1, 3, 6, 4, 5, 9, 1,
-          7, 8, 2, 4, 3, 8, 9, 5, 7, 2, 1, 6, 2, 5, 6, 1, 8, 4, 9, 7, 3, 1, 7, 9,
-          3, 2, 6, 8, 4, 5, 8, 4, 5, 2, 1, 9, 3, 6, 7, 9, 1, 3, 7, 6, 8, 5, 2, 4,
-          6, 2, 7, 4, 3, 5, 1, 9, 8,
-        ],
-      },
-      hard: {
-        board: [
-          0, 0, 0, 0, 0, 0, 6, 8, 0, 0, 0, 0, 0, 0, 3, 0, 0, 0, 7, 0, 0, 0, 9, 0,
-          0, 0, 0, 5, 0, 0, 0, 0, 7, 0, 0, 0, 0, 0, 0, 0, 4, 5, 7, 0, 0, 0, 0, 0,
-          1, 0, 0, 0, 0, 3, 0, 0, 1, 0, 0, 0, 0, 0, 6, 0, 0, 8, 5, 0, 0, 0, 0, 0,
-          0, 9, 0, 0, 0, 0, 4, 0, 0,
-        ],
-        solution: [
-          1, 2, 3, 4, 5, 6, 6, 8, 9, 4, 5, 6, 7, 8, 3, 1, 2, 3, 7, 8, 9, 1, 9, 2,
-          3, 4, 5, 5, 1, 2, 3, 6, 7, 8, 9, 4, 6, 3, 4, 8, 4, 5, 7, 1, 2, 8, 7, 5,
-          1, 2, 9, 6, 3, 3, 2, 4, 1, 9, 3, 8, 5, 7, 6, 3, 6, 8, 5, 7, 4, 2, 9, 1,
-          9, 9, 7, 2, 1, 3, 4, 5, 8,
-        ],
-      },
-  };
-
-  const puzzle = puzzles[difficulty];
-
-  // Note: The hard puzzle solution above has some duplicates, let me fix it
-  if (difficulty === 'hard') {
-    return {
-      board: puzzle.board,
-      solution: [
-        1, 2, 3, 4, 5, 6, 6, 8, 9, 4, 5, 6, 7, 8, 3, 1, 2, 3, 7, 8, 9, 1, 9, 2,
-        3, 4, 5, 5, 1, 2, 3, 6, 7, 8, 9, 4, 6, 3, 4, 8, 4, 5, 7, 1, 2, 8, 7, 5,
-        1, 2, 9, 6, 3, 3, 2, 4, 1, 9, 3, 8, 5, 7, 6, 3, 6, 8, 5, 7, 4, 2, 9, 1,
-        9, 9, 7, 2, 1, 3, 4, 5, 8,
-      ],
-    };
-  }
-
-  // Validate the fallback puzzle
-  if (!isValidSudokuBoard(puzzle.solution)) {
-    console.error('Invalid fallback puzzle for difficulty:', difficulty);
-    // Return a simple valid puzzle as ultimate fallback
-    return {
-      board: Array(81).fill(0),
-      solution: [
-        1, 2, 3, 4, 5, 6, 7, 8, 9, 4, 5, 6, 7, 8, 9, 1, 2, 3, 7, 8, 9, 1, 2, 3,
-        4, 5, 6, 2, 3, 4, 5, 6, 7, 8, 9, 1, 5, 6, 7, 8, 9, 1, 2, 3, 4, 8, 9, 1,
-        2, 3, 4, 5, 6, 7, 3, 4, 5, 6, 7, 8, 9, 1, 2, 6, 7, 8, 9, 1, 2, 3, 4, 5,
-        9, 1, 2, 3, 4, 5, 6, 7, 8,
-      ],
-    };
-  }
-
-  return puzzle;
-}
-
-// Enhanced puzzle difficulty analyzer
 export function analyzeDifficulty(board: number[]): {
   difficulty: Difficulty;
   emptyCount: number;
@@ -511,7 +353,6 @@ export function analyzeDifficulty(board: number[]): {
   const emptyCount = board.filter((cell) => cell === 0).length;
   let constraintScore = 0;
 
-  // Calculate constraint score based on how many numbers are possible for each empty cell
   for (let i = 0; i < 81; i++) {
     if (board[i] === 0) {
       let possibilities = 0;
@@ -534,7 +375,10 @@ export function analyzeDifficulty(board: number[]): {
   return { difficulty, emptyCount, constraintScore };
 }
 
-// Utility functions remain the same
+// ============================================================================
+// UTILITY FUNCTIONS
+// ============================================================================
+
 export function formatTime(seconds: number): string {
   const minutes = Math.floor(seconds / 60);
   const remainingSeconds = seconds % 60;
