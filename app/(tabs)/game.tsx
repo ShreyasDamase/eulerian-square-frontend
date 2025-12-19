@@ -1,12 +1,19 @@
-import { View, Text, StyleSheet, Alert, BackHandler } from 'react-native';
+import {
+  View,
+  Text,
+  StyleSheet,
+  Dimensions,
+  Alert,
+  BackHandler,
+} from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import { useRouter } from 'expo-router';
+import { useLocalSearchParams, useRouter } from 'expo-router';
 import { useState, useEffect, useCallback, useRef, useMemo } from 'react';
 import { SudokuGrid } from '@/components/SudokuGrid';
 import { NumberPad } from '@/components/NumberPad';
 import { GameHeader } from '@/components/GameHeader';
 import { GameControls } from '@/components/GameControls';
-import { validateSudoku } from '@/utils/sudokuLogic';
+import { generateSudoku, validateSudoku } from '@/utils/sudokuLogic';
 import { useTheme } from '@/contexts/ThemeContext';
 import { useSound } from '@/contexts/SoundContext';
 import { useOrientation } from '@/hooks/useWindowDimensions';
@@ -22,12 +29,11 @@ interface GameStats {
 }
 
 export default function GameScreen() {
+  const params = useLocalSearchParams();
   const router = useRouter();
   const { isLandscape } = useOrientation();
   const { colors } = useTheme();
   const { playSound, vibrate } = useSound();
-
-  // ✅ FIXED: Read difficulty from store (NOT params)
   const difficulty = useSudokuStore((state) => state.difficulty);
 
   const timerRef = useRef<ReturnType<typeof setInterval> | null>(null);
@@ -57,12 +63,12 @@ export default function GameScreen() {
     clearCell,
     pause,
     resume,
+    reset,
     initialize,
     selectCell: storeSelectCell,
     useHint: storeUseHint,
     updateErrors,
     setTime,
-    startNewGame: startNewGameInStore,
   } = useSudokuStore();
 
   // Computed values
@@ -110,24 +116,29 @@ export default function GameScreen() {
     }
   }, []);
 
-  // ✅ FIXED: Use store's startNewGame
+  // Game logic functions
   const startNewGame = useCallback(async () => {
     if (!mountedRef.current) return;
     playSound('tap');
     setIsLoading(true);
 
     try {
-      await startNewGameInStore(difficulty);
-      console.log('✅ New game started');
+      console.log('🧪 Generating puzzle...');
+      const puzzle = await generateSudoku(difficulty);
+      console.log('✅ Puzzle generated');
+
+      if (!mountedRef.current) return;
+
+      // Initialize store with new puzzle
+      initialize(puzzle, difficulty);
+      console.log('✅ Game initialized');
     } catch (err) {
-      console.error('❌ Error starting new game:', err);
-      Alert.alert('Error', 'Failed to start new game. Please try again.');
+      console.error('❌ Error during startNewGame:', err);
+      Alert.alert('Error', 'Something went wrong while starting a new game.');
     } finally {
-      if (mountedRef.current) {
-        setIsLoading(false);
-      }
+      setIsLoading(false);
     }
-  }, [difficulty, playSound, startNewGameInStore]);
+  }, [difficulty, playSound, initialize]);
 
   const togglePause = useCallback(() => {
     playSound('tap');
@@ -163,6 +174,7 @@ export default function GameScreen() {
       const completed =
         newBoard.every((cell) => cell !== 0) && newErrors.length === 0;
 
+      // Update cell in store
       setCell(selectedCell, value);
       updateErrors(newErrors);
 
@@ -171,6 +183,7 @@ export default function GameScreen() {
         vibrate('medium');
         pauseTimer();
 
+        // Update stats
         setGameStats((prev) => ({
           ...prev,
           gamesPlayed: prev.gamesPlayed + 1,
@@ -240,6 +253,7 @@ export default function GameScreen() {
       playSound('success');
       vibrate('light');
 
+      // Recalculate errors after hint
       const newErrors = validateSudoku(useSudokuStore.getState().board);
       updateErrors(newErrors);
     } else {
@@ -280,6 +294,7 @@ export default function GameScreen() {
     }
   }, [board, playSound, updateErrors]);
 
+  // Handle back button
   const handleBackPress = useCallback(() => {
     if (isGameActive) {
       Alert.alert(
@@ -306,30 +321,32 @@ export default function GameScreen() {
     if (!isCompleted && !isPaused && puzzleId) {
       const autoSaveInterval = setInterval(() => {
         persist();
-      }, 30000);
+      }, 30000); // Save every 30 seconds
 
       return () => clearInterval(autoSaveInterval);
     }
   }, [isCompleted, isPaused, puzzleId, persist]);
 
-  // ✅ FIXED: Initialize game properly
+  // Initialize game
   useEffect(() => {
     mountedRef.current = true;
 
     const initializeGame = async () => {
-      // Hydrate saved state
+      // Try to hydrate saved state
       hydrate();
 
-      // Check if we have a valid saved game
+      // Check if we have a valid saved game for this difficulty
       const store = useSudokuStore.getState();
-
-      if (store.puzzleId && store.board.some((v) => v !== 0)) {
-        console.log('✅ Loaded saved game:', store.puzzleId);
+      if (
+        store.puzzleId &&
+        store.difficulty === difficulty &&
+        store.board.some((v) => v !== 0)
+      ) {
+        console.log('✅ Loaded saved game');
         setIsLoading(false);
       } else {
-        console.log('⚠️ No saved game found - this should not happen');
-        // If HomeScreen did its job, we should never reach here
-        setIsLoading(false);
+        console.log('🆕 Starting new game');
+        await startNewGame();
       }
     };
 
@@ -338,7 +355,7 @@ export default function GameScreen() {
     return () => {
       mountedRef.current = false;
     };
-  }, []); // Only run once on mount
+  }, [difficulty, hydrate, startNewGame]);
 
   // Handle timer
   useEffect(() => {
@@ -379,7 +396,7 @@ export default function GameScreen() {
       >
         <View style={styles.loadingContainer}>
           <Text style={[styles.loadingText, { color: colors.text }]}>
-            Loading game...
+            Generating puzzle...
           </Text>
         </View>
       </SafeAreaView>

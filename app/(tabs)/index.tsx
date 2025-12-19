@@ -25,6 +25,7 @@ import { useState, useEffect, useRef } from 'react';
 import { LinearGradient } from 'expo-linear-gradient';
 import { useSudokuStore } from '@/utils/useSudokuStore';
 import { S, V, R, H, getWidth, getHeight } from '@/utils/responsive';
+import { useAdaptivePadding } from '@/components/AdaptiveContent';
 
 interface DifficultyLevel {
   level: 'easy' | 'medium' | 'hard';
@@ -58,7 +59,9 @@ export default function HomeScreen() {
   });
   const [isStarting, setIsStarting] = useState(false);
 
-  // 🔥 Access store's startNewGame
+  // 🔄 Get adaptive padding based on orientation
+  const { paddingLeft, paddingBottom, isLandscape } = useAdaptivePadding();
+
   const startNewGameInStore = useSudokuStore((state) => state.startNewGame);
 
   const difficultyLevels: DifficultyLevel[] = [
@@ -116,7 +119,6 @@ export default function HomeScreen() {
   ];
 
   useEffect(() => {
-    // TODO: Load actual stats from AsyncStorage
     setGameStats({
       totalGames: 23,
       gamesWon: 18,
@@ -125,18 +127,14 @@ export default function HomeScreen() {
     });
   }, []);
 
-  // ✅ FIXED: Properly initialize store BEFORE navigation
   const startGame = async (difficulty: 'easy' | 'medium' | 'hard') => {
-    if (isStarting) return; // Prevent double-tap
+    if (isStarting) return;
 
     playSound('tap');
     setIsStarting(true);
 
     try {
-      // 🔥 CRITICAL: Reset store + generate new puzzle
       await startNewGameInStore(difficulty);
-
-      // ✅ Navigate AFTER store is ready (no params needed)
       router.replace('/game');
     } catch (error) {
       console.error('Failed to start game:', error);
@@ -156,7 +154,6 @@ export default function HomeScreen() {
     router.push('/achievements');
   };
 
-  // Header animation based on scroll
   const headerOpacity = scrollY.interpolate({
     inputRange: [0, 100],
     outputRange: [1, 0.8],
@@ -176,7 +173,13 @@ export default function HomeScreen() {
 
   return (
     <SafeAreaView
-      style={[styles.container, { backgroundColor: colors.background }]}
+      style={[
+        styles.container,
+        {
+          backgroundColor: colors.background,
+          paddingLeft, // 🔄 Adaptive padding for landscape
+        },
+      ]}
     >
       <StatusBar
         barStyle={colors.text === '#000000' ? 'dark-content' : 'light-content'}
@@ -184,7 +187,10 @@ export default function HomeScreen() {
 
       <ScrollView
         showsVerticalScrollIndicator={false}
-        contentContainerStyle={styles.scrollContent}
+        contentContainerStyle={[
+          styles.scrollContent,
+          { paddingBottom: paddingBottom + V.lg }, // 🔄 Extra padding for tab bar
+        ]}
         bounces={true}
         scrollEventThrottle={16}
         onScroll={onScroll}
@@ -206,7 +212,9 @@ export default function HomeScreen() {
         </Animated.View>
 
         {/* Quick Stats */}
-        <View style={styles.statsContainer}>
+        <View
+          style={[styles.statsContainer, isLandscape && styles.statsLandscape]}
+        >
           <TouchableOpacity
             style={[styles.statCard, { backgroundColor: colors.surface }]}
             onPress={showStats}
@@ -377,8 +385,6 @@ export default function HomeScreen() {
             })}
           </View>
         </View>
-
-        <View style={styles.bottomSpacing} />
       </ScrollView>
     </SafeAreaView>
   );
@@ -412,6 +418,10 @@ const styles = StyleSheet.create({
     paddingHorizontal: S.lg,
     marginBottom: V.xl,
     gap: S.smPlus,
+  },
+  statsLandscape: {
+    // Optional: adjust stats layout in landscape
+    flexWrap: 'wrap',
   },
   statCard: {
     flex: 1,
@@ -532,8 +542,5 @@ const styles = StyleSheet.create({
   infoText: {
     fontSize: getWidth(14),
     lineHeight: getHeight(20),
-  },
-  bottomSpacing: {
-    height: V.lg,
   },
 });
