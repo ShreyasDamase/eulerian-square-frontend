@@ -1,4 +1,4 @@
-package com.shreyas.sudoku.preview
+package com.shreyas.sudoku
 import expo.modules.splashscreen.SplashScreenManager
 
 import android.os.Build

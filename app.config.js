@@ -1,7 +1,33 @@
-const VARIANT = process.env.APP_VARIANT || 'preview';
+const VARIANT =
+  process.env.EAS_BUILD_PROFILE ||
+  process.env.EAS_SUBMIT_PROFILE ||
+  process.env.APP_VARIANT ||
+  'production';
+
+const VALID_VARIANTS = ['development', 'preview', 'production'];
+
+if (!VALID_VARIANTS.includes(VARIANT)) {
+  throw new Error(
+    `❌ Invalid APP_VARIANT: ${VARIANT}. Must be development | preview | production`,
+  );
+}
 
 const IS_DEV = VARIANT === 'development';
 const IS_PREVIEW = VARIANT === 'preview';
+
+const isEasBuild = !!process.env.EAS_BUILD_PROFILE;
+
+// 🔍 Debug visibility
+console.log('CONFIG LOAD →', {
+  VARIANT,
+  isEasBuild,
+  EAS_BUILD_PROFILE: process.env.EAS_BUILD_PROFILE,
+  APP_VARIANT: process.env.APP_VARIANT,
+});
+
+// ─────────────────────────────────────────────
+// APP METADATA
+// ─────────────────────────────────────────────
 
 const getAppName = () => {
   if (IS_DEV) return 'Sudoku Dev';
@@ -27,6 +53,20 @@ const getIosBundleId = () => {
   return 'com.shreyas.sudoku';
 };
 
+// ─────────────────────────────────────────────
+// ENV-DRIVEN API CONFIG (important)
+// ─────────────────────────────────────────────
+
+const getApiUrl = () => {
+  if (IS_DEV) return 'http://localhost:3000';
+  if (IS_PREVIEW) return 'https://preview-api.yourapp.com';
+  return 'https://api.yourapp.com';
+};
+
+// ─────────────────────────────────────────────
+// EXPORT CONFIG
+// ─────────────────────────────────────────────
+
 module.exports = {
   expo: {
     name: getAppName(),
@@ -35,7 +75,6 @@ module.exports = {
 
     orientation: 'default',
     userInterfaceStyle: 'automatic',
-    newArchEnabled: true,
 
     icon: './assets/images/icon.png',
     scheme: getScheme(),
@@ -54,6 +93,8 @@ module.exports = {
     // ─── ANDROID ─────────────────────────────
     android: {
       package: getAndroidPackage(),
+      softwareKeyboardLayoutMode: 'pan',
+
       permissions: ['POST_NOTIFICATIONS', 'VIBRATE', 'RECEIVE_BOOT_COMPLETED'],
     },
 
@@ -64,7 +105,7 @@ module.exports = {
       favicon: './assets/images/favicon.png',
     },
 
-    // ─── PLUGINS (MATCH BOOMM SDK LEVELS) ────
+    // ─── PLUGINS ─────────────────────────────
     plugins: [
       'expo-router',
       'expo-font',
@@ -74,13 +115,22 @@ module.exports = {
         'expo-build-properties',
         {
           android: {
-            compileSdkVersion: 35,
-            targetSdkVersion: 35,
-            buildToolsVersion: '35.0.0',
+            compileSdkVersion: 36,
+            targetSdkVersion: 36,
+            buildToolsVersion: '36.0.0',
+            reactNativeBuildFromSource: true,
+            buildReactNativeFromSource: true,
+            useHermesV1: true,
           },
           ios: {
             deploymentTarget: '15.1',
             useFrameworks: 'static',
+            customBuildFlags: [
+              '-DSQLITE_ENABLE_DBSTAT_VTAB=1 -DSQLITE_ENABLE_SNAPSHOT=1',
+            ],
+            reactNativeBuildFromSource: true,
+            buildReactNativeFromSource: true,
+            useHermesV1: true,
           },
         },
       ],
@@ -92,16 +142,23 @@ module.exports = {
           color: '#ffffff',
         },
       ],
+      'react-native-edge-to-edge',
+      'expo-font',
+      'expo-web-browser',
+      'expo-secure-store',
     ],
 
     experiments: {
-      typedRoutes: true,
+      tsconfigPaths: true,
+      reactCompiler: true,
     },
 
     extra: {
       router: {},
+      appVariant: VARIANT,
+      apiUrl: getApiUrl(), // ✅ IMPORTANT
       eas: {
-        projectId: '4b4368d8-0e2b-413e-adec-b3e18584f9a5',
+        projectId: '6aadea5a-b328-4ae6-a9ca-6903362161c9',
       },
     },
   },

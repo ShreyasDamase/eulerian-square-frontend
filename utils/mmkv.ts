@@ -1,5 +1,5 @@
-// storage/mmkv.ts
-import { createMMKV } from 'react-native-mmkv';
-export const mmkv = createMMKV({
+import { MMKV } from 'react-native-mmkv';
+
+export const mmkv = new MMKV({
   id: 'sudoku-storage',
 });

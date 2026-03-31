@@ -63,7 +63,7 @@ export const useSudokuStore = create<SudokuStore>((set, get) => ({
       console.log(`🎮 Starting new ${difficulty} game...`);
 
       // 🔥 CRITICAL: Clear previous game completely
-      mmkv.remove(STORAGE_KEY);
+      mmkv.delete(STORAGE_KEY);
 
       // Generate fresh puzzle
       const puzzle = await generateSudoku(difficulty);
@@ -260,7 +260,7 @@ export const useSudokuStore = create<SudokuStore>((set, get) => ({
   },
 
   reset() {
-    mmkv.remove(STORAGE_KEY);
+    mmkv.delete(STORAGE_KEY);
     set({
       puzzleId: '',
       difficulty: 'easy',
